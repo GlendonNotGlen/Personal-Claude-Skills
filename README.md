@@ -27,3 +27,4 @@ Skills are defined in Markdown files and placed in your Claude config directory:
 ### Personal Skills
 
 - **professional-readme-architect** (personal) — Generate/rewrite READMEs following Art of README and Standard README philosophies; strips AI filler, enforces information density
+- **technical-doc-architect** (personal) — Structure technical docs using the Diátaxis framework (Tutorial/How-to/Reference/Explanation); optimized for cybersecurity, infrastructure, and Obsidian/Git rendering
