@@ -1,6 +1,6 @@
 ---
 name: technical-doc-architect
-description: Generate, structure, or refine technical documentation strictly following the Diátaxis framework and Docs-as-Code engineering standards. Use this skill whenever the user wants to write or improve technical docs, create a tutorial, write a how-to guide, build a reference page, or explain system architecture and design decisions. Also trigger when the user provides raw notes, code snippets, or tool descriptions and wants them turned into structured documentation. Especially relevant for cybersecurity tools, offensive security notes, Active Directory environments, infrastructure architecture, and Obsidian/Git-hosted knowledge bases. If the user says their docs are "unstructured", "messy", or "hard to navigate", use this skill.
+description: Write, restructure, or improve technical documentation using the Diataxis framework (tutorials, how-to guides, reference pages, explanations). Trigger when the user asks to create docs, convert raw notes or code into documentation, improve existing docs structure, write a tutorial or how-to guide, build a reference page, or document architecture decisions.
 ---
 
 # Technical Doc Architect
@@ -20,14 +20,14 @@ Diátaxis defines four distinct documentation quadrants. Each serves a different
 
 ### Identifying the Right Quadrant
 
-When `technical_context` is provided without a specified quadrant:
+When the user's request does not specify a quadrant:
 1. Look for intent signals in the input:
-   - Step-by-step walkthrough → Tutorial
-   - "How to..." / task-focused → How-to Guide
-   - Flag definitions, API params, CLI syntax → Reference
-   - Architecture, rationale, tradeoffs → Explanation
-2. If still ambiguous, ask: *"Which Diátaxis quadrant are you targeting: Tutorial, How-to Guide, Reference, or Explanation?"* — then proceed once confirmed.
-3. If the input spans multiple quadrants, produce separate sections with a clear note that they should ideally live in separate documents.
+   - Step-by-step walkthrough for beginners → **Tutorial**
+   - "How to..." / task-focused / solving a specific problem → **How-to Guide**
+   - Flag definitions, API params, CLI syntax, config options → **Reference**
+   - Architecture, rationale, tradeoffs, "why" questions → **Explanation**
+2. If still ambiguous, ask: *"Which Diataxis quadrant are you targeting: Tutorial, How-to Guide, Reference, or Explanation?"* -- then proceed once confirmed.
+3. If the input spans multiple quadrants, produce separate documents (or clearly separated sections with a note that they should be split into separate files).
 
 ---
 
@@ -35,7 +35,7 @@ When `technical_context` is provided without a specified quadrant:
 
 - **Quadrant mixing**: No architectural deep-dives inside a how-to guide. No tutorial hand-holding inside a reference page.
 - **Marketing language**: Remove "powerful", "seamless", "robust", "next-generation", "industry-leading".
-- **Passive voice**: "The command is run by the user" → "Run the command."
+- **Passive voice**: Prefer imperative. "The command is run by the user" → "Run the command." / "The file should be saved" → "Save the file."
 - **Walls of text**: No paragraph longer than 5 lines without a break, list, or code block.
 - **Undefined acronyms**: Define every acronym on first use — especially critical in cybersecurity (e.g., "LSASS (Local Security Authority Subsystem Service)").
 - **Vague prerequisites**: "Install the required dependencies" is not a prerequisite. Exact version numbers, install commands, and OS constraints are.
@@ -192,9 +192,21 @@ Goal: help the reader understand *why*, not just *what* or *how*. No steps, no p
 
 ---
 
+## Refactoring Existing Documentation
+
+When the user provides existing docs to improve (not write from scratch):
+
+1. **Diagnose first**: Identify which anti-patterns are present (quadrant mixing, missing prerequisites, walls of text, vague steps, etc.).
+2. **Classify**: Determine which Diataxis quadrant(s) the content belongs to. If it mixes quadrants, split it.
+3. **Restructure**: Apply the appropriate quadrant template. Preserve all technical accuracy from the original -- do not invent details or remove correct information.
+4. **Flag gaps**: Use `<!-- TODO: ... -->` for missing details (e.g., exact version numbers, expected output) rather than guessing.
+5. **Show what changed**: When refactoring, briefly note what structural changes were made and why (e.g., "Moved architecture rationale to a separate Explanation doc; the How-to Guide now focuses only on task steps").
+
+---
+
 ## Domain-Specific Rules: Cybersecurity & Infrastructure
 
-When `technical_context` involves offensive security tools, exploits, Active Directory, or infrastructure:
+**Apply this section only when** the documentation involves offensive security tools, exploits, Active Directory, penetration testing, or infrastructure architecture.
 
 ### Operational Safety
 - Open every document with a **Target Environment** or **Lab Requirements** block specifying the exact setup (domain name, OS versions, IP ranges, user context).
@@ -207,8 +219,9 @@ When `technical_context` involves offensive security tools, exploits, Active Dir
 - If a tool's behavior differs across versions (e.g., impacket, BloodHound, CrackMapExec), note the version it was tested on.
 
 ### Obsidian / Git Optimization
-- Use `[[wikilinks]]` syntax for cross-document references when the output is destined for Obsidian.
-- Use standard `[text](path)` links for Git repositories.
+- **Ask the user** if the output is for Obsidian or a Git repository if not already clear from context.
+- Obsidian: use `[[wikilinks]]` for cross-document references.
+- Git/GitHub: use standard `[text](path)` Markdown links.
 - Add YAML frontmatter for Obsidian notes:
 
 ```yaml
@@ -225,8 +238,7 @@ status: draft | review | stable
 
 ## Output Format
 
-Produce a single, complete Markdown document. Do not add commentary or preamble — output the document directly.
-
-If the quadrant was not specified, ask first, then produce the document after confirmation.
-
-Use `<!-- TODO: ... -->` for any detail that cannot be determined from the provided `technical_context`.
+- Produce a complete Markdown document. Do not add preamble like "Here is your document:" -- output the document directly.
+- If the content spans multiple quadrants, produce separate documents clearly labeled.
+- Use `<!-- TODO: ... -->` for any detail that cannot be determined from the user's input rather than inventing information.
+- If the quadrant cannot be inferred from intent signals (see "Identifying the Right Quadrant" above), ask before writing.

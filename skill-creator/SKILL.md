@@ -1,44 +1,32 @@
 ---
 name: skill-creator
-description: Create new skills, modify and improve existing skills, and measure skill performance. Use when users want to create a skill from scratch, edit, or optimize an existing skill, run evals to test a skill, benchmark skill performance with variance analysis, or optimize a skill's description for better triggering accuracy.
+description: Create new skills, modify and improve existing skills, and measure skill performance. Use when users want to create a skill from scratch, edit or optimize an existing skill, run evals to test a skill, benchmark skill performance with variance analysis, or optimize a skill's description for better triggering accuracy. Trigger this skill whenever the user mentions creating, editing, testing, benchmarking, or improving a skill, even if they just say something like "make this into a skill" or "this skill isn't working well."
 ---
 
 # Skill Creator
 
-A skill for creating new skills and iteratively improving them.
+Create new skills and iteratively improve them through a draft-test-review loop.
 
-At a high level, the process of creating a skill goes like this:
+## Core workflow
 
-- Decide what you want the skill to do and roughly how it should do it
-- Write a draft of the skill
-- Create a few test prompts and run claude-with-access-to-the-skill on them
-- Help the user evaluate the results both qualitatively and quantitatively
-  - While the runs happen in the background, draft some quantitative evals if there aren't any (if there are some, you can either use as is or modify if you feel something needs to change about them). Then explain them to the user (or if they already existed, explain the ones that already exist)
-  - Use the `eval-viewer/generate_review.py` script to show the user the results for them to look at, and also let them look at the quantitative metrics
-- Rewrite the skill based on feedback from the user's evaluation of the results (and also if there are any glaring flaws that become apparent from the quantitative benchmarks)
-- Repeat until you're satisfied
-- Expand the test set and try again at larger scale
+1. **Define** what the skill does and when it should trigger
+2. **Draft** the SKILL.md
+3. **Test** by running Claude-with-the-skill on realistic prompts (with and without the skill as baseline)
+4. **Evaluate** results with the user -- use `eval-viewer/generate_review.py` for qualitative review and quantitative benchmarks
+5. **Improve** the skill based on feedback and benchmark data
+6. **Repeat** steps 3-5 until the user is satisfied
+7. **Optimize** the description for triggering accuracy (optional, via `scripts/run_loop.py`)
+8. **Package** the final skill
 
-Your job when using this skill is to figure out where the user is in this process and then jump in and help them progress through these stages. So for instance, maybe they're like "I want to make a skill for X". You can help narrow down what they mean, write a draft, write the test cases, figure out how they want to evaluate, run all the prompts, and repeat.
-
-On the other hand, maybe they already have a draft of the skill. In this case you can go straight to the eval/iterate part of the loop.
-
-Of course, you should always be flexible and if the user is like "I don't need to run a bunch of evaluations, just vibe with me", you can do that instead.
-
-Then after the skill is done (but again, the order is flexible), you can also run the skill description improver, which we have a whole separate script for, to optimize the triggering of the skill.
-
-Cool? Cool.
+Assess where the user is in this workflow and pick up from there. If they say "I want to make a skill for X", start at step 1. If they already have a draft, jump to step 3. If they say "just vibe with me" and do not want formal evals, adapt accordingly.
 
 ## Communicating with the user
 
-The skill creator is liable to be used by people across a wide range of familiarity with coding jargon. If you haven't heard (and how could you, it's only very recently that it started), there's a trend now where the power of Claude is inspiring plumbers to open up their terminals, parents and grandparents to google "how to install npm". On the other hand, the bulk of users are probably fairly computer-literate.
+Adapt your language to the user's technical level based on context cues in their messages.
 
-So please pay attention to context cues to understand how to phrase your communication! In the default case, just to give you some idea:
-
-- "evaluation" and "benchmark" are borderline, but OK
-- for "JSON" and "assertion" you want to see serious cues from the user that they know what those things are before using them without explaining them
-
-It's OK to briefly explain terms if you're in doubt, and feel free to clarify terms with a short definition if you're unsure if the user will get it.
+- Terms like "evaluation" and "benchmark" are generally fine to use without explanation.
+- Terms like "JSON", "assertion", and "subagent" should be briefly defined on first use unless the user has demonstrated familiarity (e.g., they use technical jargon themselves).
+- When in doubt, add a short parenthetical definition rather than assuming knowledge.
 
 ---
 
@@ -66,7 +54,7 @@ Based on the user interview, fill in these components:
 - **name**: Skill identifier
 - **description**: When to trigger, what it does. This is the primary triggering mechanism - include both what the skill does AND specific contexts for when to use it. All "when to use" info goes here, not in the body. Note: currently Claude has a tendency to "undertrigger" skills -- to not use them when they'd be useful. To combat this, please make the skill descriptions a little bit "pushy". So for instance, instead of "How to build a simple fast dashboard to display internal Anthropic data.", you might write "How to build a simple fast dashboard to display internal Anthropic data. Make sure to use this skill whenever the user mentions dashboards, data visualization, internal metrics, or wants to display any kind of company data, even if they don't explicitly ask for a 'dashboard.'"
 - **compatibility**: Required tools, dependencies (optional, rarely needed)
-- **the rest of the skill :)**
+- **body**: Step-by-step instructions, output format templates, examples, and references to bundled resources
 
 ### Skill Writing Guide
 
@@ -108,7 +96,7 @@ cloud-deploy/
 ```
 Claude reads only the relevant reference file.
 
-#### Principle of Lack of Surprise
+#### Security and Safety
 
 This goes without saying, but skills must not contain malware, exploit code, or any content that could compromise system security. A skill's contents should not surprise the user in their intent if described. Don't go along with requests to create misleading skills or skills designed to facilitate unauthorized access, data exfiltration, or other malicious activities. Things like a "roleplay as an XYZ" are OK though.
 
@@ -136,7 +124,9 @@ Output: feat(auth): implement JWT-based authentication
 
 ### Writing Style
 
-Try to explain to the model why things are important in lieu of heavy-handed musty MUSTs. Use theory of mind and try to make the skill general and not super-narrow to specific examples. Start by writing a draft and then look at it with fresh eyes and improve it.
+- Explain the *why* behind instructions rather than relying on "ALWAYS" / "NEVER" directives. Reasoning-based instructions are more robust than rigid rules because the model can generalize to novel situations.
+- Write skills that are general enough to handle varied inputs, not narrowly tailored to specific examples.
+- Draft first, then review with fresh eyes and revise before sharing.
 
 ### Test Cases
 
@@ -303,7 +293,7 @@ This is the heart of the loop. You've run the test cases, the user has reviewed 
 
 4. **Look for repeated work across test cases.** Read the transcripts from the test runs and notice if the subagents all independently wrote similar helper scripts or took the same multi-step approach to something. If all 3 test cases resulted in the subagent writing a `create_docx.py` or a `build_chart.py`, that's a strong signal the skill should bundle that script. Write it once, put it in `scripts/`, and tell the skill to use it. This saves every future invocation from reinventing the wheel.
 
-This task is pretty important (we are trying to create billions a year in economic value here!) and your thinking time is not the blocker; take your time and really mull things over. I'd suggest writing a draft revision and then looking at it anew and making improvements. Really do your best to get into the head of the user and understand what they want and need.
+Take your time with revisions. Write a draft, review it with fresh eyes, then refine before presenting. Aim to deeply understand the user's goals, not just their surface-level feedback.
 
 ### The iteration loop
 
@@ -444,15 +434,15 @@ In Claude.ai, the core workflow is the same (draft → test → review → impro
 
 ## Cowork-Specific Instructions
 
-If you're in Cowork, the main things to know are:
+If you are in Cowork:
 
-- You have subagents, so the main workflow (spawn test cases in parallel, run baselines, grade, etc.) all works. (However, if you run into severe problems with timeouts, it's OK to run the test prompts in series rather than parallel.)
-- You don't have a browser or display, so when generating the eval viewer, use `--static <output_path>` to write a standalone HTML file instead of starting a server. Then proffer a link that the user can click to open the HTML in their browser.
-- For whatever reason, the Cowork setup seems to disincline Claude from generating the eval viewer after running the tests, so just to reiterate: whether you're in Cowork or in Claude Code, after running tests, you should always generate the eval viewer for the human to look at examples before revising the skill yourself and trying to make corrections, using `generate_review.py` (not writing your own boutique html code). Sorry in advance but I'm gonna go all caps here: GENERATE THE EVAL VIEWER *BEFORE* evaluating inputs yourself. You want to get them in front of the human ASAP!
-- Feedback works differently: since there's no running server, the viewer's "Submit All Reviews" button will download `feedback.json` as a file. You can then read it from there (you may have to request access first).
-- Packaging works — `package_skill.py` just needs Python and a filesystem.
-- Description optimization (`run_loop.py` / `run_eval.py`) should work in Cowork just fine since it uses `claude -p` via subprocess, not a browser, but please save it until you've fully finished making the skill and the user agrees it's in good shape.
-- **Updating an existing skill**: The user might be asking you to update an existing skill, not create a new one. Follow the update guidance in the claude.ai section above.
+- Subagents are available, so the full parallel workflow (spawn test cases, run baselines, grade) works. If timeouts are a problem, run test prompts in series instead.
+- No browser/display is available. Use `--static <output_path>` with `generate_review.py` to write a standalone HTML file, then share the link for the user to open.
+- **Critical**: Always generate the eval viewer via `generate_review.py` before revising the skill yourself. Do not write custom HTML. Do not skip this step. Get outputs in front of the user first.
+- Feedback: since there is no running server, "Submit All Reviews" downloads `feedback.json` as a file. Read it from the download location.
+- `package_skill.py` works normally (requires Python and filesystem).
+- Description optimization (`run_loop.py`) works via `claude -p` subprocess. Save this step until the skill is finalized and the user agrees it is ready.
+- **Updating an existing skill**: Follow the update guidance in the Claude.ai section above.
 
 ---
 
@@ -469,17 +459,11 @@ The references/ directory has additional documentation:
 
 ---
 
-Repeating one more time the core loop here for emphasis:
+## Checklist (do not skip)
 
-- Figure out what the skill is about
-- Draft or edit the skill
-- Run claude-with-access-to-the-skill on test prompts
-- With the user, evaluate the outputs:
-  - Create benchmark.json and run `eval-viewer/generate_review.py` to help the user review them
-  - Run quantitative evals
-- Repeat until you and the user are satisfied
-- Package the final skill and return it to the user.
+Before revising the skill yourself, always:
+1. Generate the eval viewer via `eval-viewer/generate_review.py` so the user can review outputs first
+2. Create `benchmark.json` via `scripts/aggregate_benchmark.py` for quantitative comparison
+3. Get user feedback before making changes
 
-Please add steps to your TodoList, if you have such a thing, to make sure you don't forget. If you're in Cowork, please specifically put "Create evals JSON and run `eval-viewer/generate_review.py` so human can review test cases" in your TodoList to make sure it happens.
-
-Good luck!
+If you have a TodoList, add "Run `eval-viewer/generate_review.py` so the user can review test outputs" as an explicit step.

@@ -1,40 +1,43 @@
 ---
 name: webapp-testing
-description: Toolkit for interacting with and testing local web applications using Playwright. Supports verifying frontend functionality, debugging UI behavior, capturing browser screenshots, and viewing browser logs.
+description: Test and interact with local web applications using Playwright. Take screenshots, verify UI behavior, capture console logs, automate form submissions, and discover page elements.
 license: Complete terms in LICENSE.txt
 ---
 
 # Web Application Testing
 
-To test local web applications, write native Python Playwright scripts.
+Write native Python Playwright scripts to test and interact with local web applications.
 
 **Helper Scripts Available**:
-- `scripts/with_server.py` - Manages server lifecycle (supports multiple servers)
+- `scripts/with_server.py` - Manages server lifecycle (start, health-check, teardown). Supports multiple servers.
 
-**Always run scripts with `--help` first** to see usage. DO NOT read the source until you try running the script first and find that a customized solution is abslutely necessary. These scripts can be very large and thus pollute your context window. They exist to be called directly as black-box scripts rather than ingested into your context window.
+**Always run scripts with `--help` first** to see usage. DO NOT read the source until you try running the script first and find that a customized solution is absolutely necessary. These scripts can be very large and thus pollute your context window. They exist to be called directly as black-box scripts rather than ingested into your context window.
 
 ## Decision Tree: Choosing Your Approach
 
 ```
-User task → Is it static HTML?
-    ├─ Yes → Read HTML file directly to identify selectors
-    │         ├─ Success → Write Playwright script using selectors
-    │         └─ Fails/Incomplete → Treat as dynamic (below)
-    │
-    └─ No (dynamic webapp) → Is the server already running?
-        ├─ No → Run: python scripts/with_server.py --help
-        │        Then use the helper + write simplified Playwright script
-        │
-        └─ Yes → Reconnaissance-then-action:
+User task --> Is it a static HTML file (no server needed)?
+    |
+    +-- Yes --> Use file:// URL directly
+    |           1. Read the HTML file to identify element selectors
+    |           2. Write Playwright script using file:// URL (no networkidle wait needed)
+    |           3. See examples/static_html_automation.py
+    |
+    +-- No (dynamic webapp) --> Is the server already running?
+        |
+        +-- No --> Start it with the helper:
+        |          1. Run: python scripts/with_server.py --help
+        |          2. Use the helper to start server + run your Playwright script
+        |
+        +-- Yes --> Reconnaissance-then-action:
             1. Navigate and wait for networkidle
-            2. Take screenshot or inspect DOM
-            3. Identify selectors from rendered state
-            4. Execute actions with discovered selectors
+            2. Take screenshot or inspect DOM to discover selectors
+            3. Execute actions with discovered selectors
 ```
 
-## Example: Using with_server.py
+## Starting Servers with with_server.py
 
-To start a server, run `--help` first, then use the helper:
+Run `--help` first, then invoke the helper. Your Playwright script only needs browser logic -- the helper manages server start/stop.
 
 **Single server:**
 ```bash
@@ -49,48 +52,101 @@ python scripts/with_server.py \
   -- python your_automation.py
 ```
 
-To create an automation script, include only Playwright logic (servers are managed automatically):
+## Writing Playwright Scripts
+
+Every script follows this skeleton. Key rules:
+- Always use `chromium` in `headless=True` mode.
+- Always call `page.wait_for_load_state('networkidle')` before inspecting or acting on dynamic pages (not needed for static `file://` URLs).
+- Always close the browser in a `finally` block or context manager.
+- Set viewport when you need consistent screenshot dimensions.
+
 ```python
 from playwright.sync_api import sync_playwright
 
 with sync_playwright() as p:
-    browser = p.chromium.launch(headless=True) # Always launch chromium in headless mode
-    page = browser.new_page()
-    page.goto('http://localhost:5173') # Server already running and ready
-    page.wait_for_load_state('networkidle') # CRITICAL: Wait for JS to execute
-    # ... your automation logic
+    browser = p.chromium.launch(headless=True)
+    page = browser.new_page(viewport={'width': 1920, 'height': 1080})
+    page.goto('http://localhost:5173')
+    page.wait_for_load_state('networkidle')
+
+    # --- Your logic here ---
+
+    # Save screenshots to /tmp/ for inspection
+    page.screenshot(path='/tmp/result.png', full_page=True)
+
     browser.close()
 ```
 
 ## Reconnaissance-Then-Action Pattern
 
-1. **Inspect rendered DOM**:
-   ```python
-   page.screenshot(path='/tmp/inspect.png', full_page=True)
-   content = page.content()
-   page.locator('button').all()
-   ```
+Use this when you do not know the page structure in advance.
 
-2. **Identify selectors** from inspection results
+**Step 1 -- Discover elements:**
+```python
+page.wait_for_load_state('networkidle')
+page.screenshot(path='/tmp/inspect.png', full_page=True)
 
-3. **Execute actions** using discovered selectors
+# Enumerate interactive elements
+buttons = page.locator('button').all()
+for i, btn in enumerate(buttons):
+    print(f"Button [{i}]: {btn.inner_text() if btn.is_visible() else '[hidden]'}")
 
-## Common Pitfall
+links = page.locator('a[href]').all()
+inputs = page.locator('input, textarea, select').all()
+```
 
-❌ **Don't** inspect the DOM before waiting for `networkidle` on dynamic apps
-✅ **Do** wait for `page.wait_for_load_state('networkidle')` before inspection
+**Step 2 -- Act on discovered selectors:**
+```python
+page.click('text=Submit')
+page.fill('#username', 'testuser')
+page.select_option('select#role', 'admin')
+```
+
+See `examples/element_discovery.py` for a full working example.
+
+## Capturing Console Logs
+
+Attach a listener **before** navigation to capture all output:
+
+```python
+console_logs = []
+
+def handle_console(msg):
+    console_logs.append(f"[{msg.type}] {msg.text}")
+
+page.on("console", handle_console)
+page.goto(url)
+page.wait_for_load_state('networkidle')
+```
+
+See `examples/console_logging.py` for the full pattern.
+
+## Common Pitfalls
+
+- **Inspecting DOM too early:** On dynamic apps, always call `page.wait_for_load_state('networkidle')` before reading elements or taking screenshots. Without this, JS-rendered content will be missing.
+- **Selectors not found:** Use `page.wait_for_selector('.my-element', timeout=5000)` instead of assuming elements exist immediately. Print the page content with `page.content()` to debug missing elements.
+- **Flaky clicks:** If a click does nothing, the target may be covered by an overlay or not yet interactive. Use `page.locator('.btn').wait_for(state='visible')` before clicking.
+
+## Selector Priority
+
+Prefer selectors in this order (most robust to least):
+1. **Test IDs:** `page.get_by_test_id('submit-btn')` (if data-testid attributes exist)
+2. **Role:** `page.get_by_role('button', name='Submit')`
+3. **Text:** `page.locator('text=Submit')`
+4. **CSS with IDs:** `page.locator('#submit-button')`
+5. **CSS classes:** `page.locator('.btn-primary')` (fragile -- classes change often)
 
 ## Best Practices
 
-- **Use bundled scripts as black boxes** - To accomplish a task, consider whether one of the scripts available in `scripts/` can help. These scripts handle common, complex workflows reliably without cluttering the context window. Use `--help` to see usage, then invoke directly. 
-- Use `sync_playwright()` for synchronous scripts
-- Always close the browser when done
-- Use descriptive selectors: `text=`, `role=`, CSS selectors, or IDs
-- Add appropriate waits: `page.wait_for_selector()` or `page.wait_for_timeout()`
+- **Use bundled scripts as black boxes.** Check `scripts/` for helpers before writing custom solutions. Run `--help` first, invoke directly.
+- **Save screenshots to `/tmp/`** so you can read them with the Read tool for visual inspection.
+- **Print actionable output** from scripts (element counts, text content, error messages) so results are visible in the terminal.
+- **Use `sync_playwright()`** -- async is unnecessary for single-script automation.
+- **Add targeted waits** (`wait_for_selector`, `wait_for_load_state`) rather than arbitrary `wait_for_timeout` calls. Use timeouts only as a last resort.
 
 ## Reference Files
 
-- **examples/** - Examples showing common patterns:
+- **examples/** - Working examples showing common patterns:
   - `element_discovery.py` - Discovering buttons, links, and inputs on a page
-  - `static_html_automation.py` - Using file:// URLs for local HTML
-  - `console_logging.py` - Capturing console logs during automation
+  - `static_html_automation.py` - Using file:// URLs for local HTML files
+  - `console_logging.py` - Capturing browser console logs during automation

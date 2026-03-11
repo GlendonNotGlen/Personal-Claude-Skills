@@ -1,11 +1,37 @@
 ---
 name: readme-architect
-description: Generate or rewrite README.md files following the "Art of README" and "Standard README" philosophies — high information density, no fluff, no badge-soup, no AI-generated filler. Use this skill whenever the user wants to create a new README, improve or rewrite an existing one, or says their README feels "too AI-generated", "too bloated", or "too generic". Also trigger for any technical/cybersecurity project (VAPT tools, scripts, CLIs) that needs documentation with proper prerequisites and security notes. Takes project_context (source code, feature list, or existing README) as input and outputs a clean, precise, markdown-formatted README.
+description: Generate, rewrite, or improve README.md files with high information density and zero fluff. Triggers on requests to create a README, rewrite a README, fix an "AI-sounding" or bloated README, or document a project. Follows Art of README and Standard README principles.
 ---
 
 # Professional README Architect
 
 Generate or rewrite README.md files with high information density and zero fluff, following the philosophies of the [Art of README](https://github.com/hackergrrl/art-of-readme) and [Standard README](https://github.com/RichardLitt/standard-readme).
+
+## Execution Workflow
+
+Follow these steps in order when invoked:
+
+### Step 1: Gather Project Context
+
+Before writing anything, collect facts from the codebase:
+
+1. Read the existing `README.md` if one exists.
+2. Read `package.json`, `pyproject.toml`, `Cargo.toml`, `go.mod`, or equivalent to determine: project name, version, dependencies, scripts/commands, license.
+3. Read the main entry point file(s) to understand what the project does.
+4. Check for a `CONTRIBUTING.md`, `LICENSE`, or `CHANGELOG.md` — reference them rather than duplicating their content.
+5. Look for config files (`.env.example`, `config.yaml`, etc.) to document configuration options.
+
+If the user provides explicit project context (feature list, description), use that and skip redundant scanning.
+
+### Step 2: Draft the README
+
+Apply the core philosophy and structure rules below to produce the README.
+
+### Step 3: Write the File
+
+- If a `README.md` already exists in the project root, edit or overwrite it directly using your file-writing tools. Do NOT output it as a code block.
+- If no `README.md` exists, create one at the project root.
+- Only output as a fenced code block if the user explicitly asks for it or if you cannot determine the correct file path.
 
 ## Core Philosophy
 
@@ -79,11 +105,12 @@ Add a **Security Considerations** section after Usage if the tool:
 
 Every sentence must carry new information. If removing a sentence would not change what the reader knows, remove it.
 
-## Output Format
+## Output Rules
 
-Produce a single, complete `README.md` as a fenced markdown code block. Do not add commentary before or after unless the user asks for it.
-
-If key information is missing from `project_context` (e.g., install steps unclear, license unknown), insert a `<!-- TODO: ... -->` placeholder rather than inventing details.
+- Write the README directly to the file system (create or overwrite `README.md`). Do not wrap the output in a code block unless the user explicitly asks for one.
+- Do not add commentary or explanation before or after the README unless the user asks for it.
+- If key information is missing and cannot be determined from the codebase (e.g., install steps unclear, license unknown), insert a `<!-- TODO: ... -->` placeholder rather than inventing details.
+- Target length: 50-200 lines for most projects. A README longer than 200 lines likely contains filler. A README under 30 lines is likely missing critical information.
 
 ## Examples
 
